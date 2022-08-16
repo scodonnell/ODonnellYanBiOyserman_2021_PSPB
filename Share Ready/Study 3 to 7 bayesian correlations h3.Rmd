@@ -1,0 +1,254 @@
+---
+title: "Bayesian correlations (h3) Study 3 to 7"
+author: "S. Casey O'Donnell"
+date: "10/17/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(haven)
+
+#install.packages("BayesFactor")
+library(BayesFactor)
+library(tidyverse)
+##read in the data for the studies using the D-AT and subset into indepedent 
+##dataframes 
+
+library(ggplot2)
+#remotes::install_github("coolbutuseless/ggpattern")
+library(ggpattern)
+library(purrr)
+
+
+DATStudies<-read_dta("/Volumes/GoogleDrive/.shortcut-targets-by-id/1HdnUIqJk4xXSTU36ZxZLpE0cred4rkNJ/Difficulty Associations Paper/Study Data and Syntax/Caseys Studies/Share Ready/Study 3-6 Data.dta")
+
+DATStudies$importavg<-as.numeric(DATStudies$importavg)
+DATStudies$impossavg<-as.numeric(DATStudies$impossavg)
+
+##for the one-sample t-tests on dscores, we need data files that do not have missing values on the variable of interest. We will re-read the files for difficulty-as-impossibility and as-importance endorsement that do not have missing values on those variables. A pipe operator could work to clean up the code, but ttestBF has some issues with piping it seems. 
+
+study3<-DATStudies%>%
+  subset(sample=="study 3" & dscore!="NA")
+
+study3Accurate<-study3%>% 
+  subset(inaccurate==0)
+
+study4<-DATStudies%>%
+  subset(sample=="study 4" & dscore!="NA")
+
+study4Accurate<-study4%>% 
+  subset(inaccurate==0)
+
+study5<-DATStudies%>%
+  subset(sample=="study 5" & dscore!="NA")
+
+study5Accurate<-study5%>% 
+  subset(inaccurate==0)
+
+study6<-DATStudies%>%
+  subset(sample=="study 6" & dscore!="NA")
+
+study6Accurate<-study6%>% 
+  subset(inaccurate==0)
+
+```
+
+run the models using BayesFactor package and the 
+correlationBF command. 
+
+Each model prints an r value (the scaling on the prior--in this case sqrt(2)/2 and the estimated bayes factor in favor of the null hypothesis. Sometimes I sample from the posterior to generate an estimate of the correlation coefficienct parameter (r) and it's 95% credible interval defined by the highest probability density (hpd)
+
+
+For each study, I run four commands. One pair refers to the sample 
+#when inaccurate responses are included vs. the other pair  that only examines respondents with Difficulty Association Task accuracies greater or equal to 75%. The "post" subscript indicates that I'm running a command that samples from the posterior distribution so that I can describe the parameter of interest: sample correlation coefficient The difference between posterior and observed is the prior. In the null model (not depicted but described in the syntax for the command: ?correlationBF--though there's a typo in the details that states incorrectly the BF is provided by "ttestBF" rather than the correlationBF command), the prior in the null model on rho (or correlation coefficient) is defined as a spike on 0 (a null correlation). In the alternative model, the prior is non-informative prior suggested by Ly, Verhagen, & Wagenmakers (2015)  which, in lay terms, basically says the rho could plausibly fall anywhere in a particular range centered on zero and could be stated as the naive hypothesis that a difference from zero is possible. There's also a prior in the standard deviation of the rho paramter, refered to as zeta. 
+
+```{r cars, the models}
+#set seed to yield consistent results on re-running syntax
+set.seed(31234)
+
+#run the models for difficulty-as-importance endorsement and dscore correlations 
+
+importdscore3<-correlationBF(study3Accurate$dscore, study3Accurate$importavg)
+importdscore3_post<-correlationBF(study3Accurate$dscore, study3Accurate$importavg, posterior=TRUE, iterations=2000)
+
+importdscore4<-correlationBF(study4Accurate$dscore, study4Accurate$importavg)
+importdscore4_post<-correlationBF(study4Accurate$dscore, study4Accurate$importavg, posterior=TRUE, iterations=2000)
+
+importdscore5<-correlationBF(study5Accurate$dscore, study5Accurate$importavg)
+importdscore5_post<-correlationBF(study5Accurate$dscore, study5Accurate$importavg, posterior=TRUE, iterations=2000)
+
+importdscore6<-correlationBF(study6Accurate$dscore, study6Accurate$importavg)
+importdscore6_post<-correlationBF(study6Accurate$dscore, study6Accurate$importavg, posterior=TRUE, iterations=2000)
+
+#run the models for difficulty-as-impossibility endorsement and dscore correlations 
+
+impossdscore3<-correlationBF(study3Accurate$dscore, study3Accurate$impossavg)
+impossdscore3_post<-correlationBF(study3Accurate$dscore, study3Accurate$impossavg, posterior=TRUE, iterations=2000)
+
+impossdscore4<-correlationBF(study4Accurate$dscore, study4Accurate$impossavg)
+impossdscore4_post<-correlationBF(study4Accurate$dscore, study4Accurate$impossavg, posterior=TRUE, iterations=2000)
+
+impossdscore5<-correlationBF(study5Accurate$dscore, study5Accurate$impossavg)
+impossdscore5_post<-correlationBF(study5Accurate$dscore, study5Accurate$impossavg, posterior=TRUE, iterations=2000)
+
+impossdscore6<-correlationBF(study6Accurate$dscore, study6Accurate$impossavg)
+impossdscore6_post<-correlationBF(study6Accurate$dscore, study6Accurate$impossavg, posterior=TRUE, iterations=2000)
+
+
+
+```
+
+```{r, the output}
+#study 3 difficulty-as-importance with dscore
+summary(importdscore3)
+summary(importdscore3_post)
+HPDinterval(importdscore3_post)
+plot(importdscore3_post[,"rho"])
+
+#study 4 difficulty-as-importance with dscore
+summary(importdscore4)
+summary(importdscore4_post)
+HPDinterval(importdscore4_post)
+plot(importdscore4_post[,"rho"])
+
+#study 5 difficulty-as-importance with dscore
+summary(importdscore5)
+summary(importdscore5_post)
+HPDinterval(importdscore5_post)
+plot(importdscore5_post[,"rho"])
+
+#study 6 difficulty-as-importance with dscore
+summary(importdscore6)
+summary(importdscore6_post)
+HPDinterval(importdscore6_post)
+plot(importdscore6_post[,"rho"])
+
+
+#study 3 difficulty-as-impossibility with dscore
+summary(impossdscore3)
+summary(impossdscore3_post)
+HPDinterval(impossdscore3_post)
+plot(impossdscore3_post[,"rho"])
+
+#study 4 difficulty-as-impossibility with dscore
+summary(impossdscore4)
+summary(impossdscore4_post)
+HPDinterval(impossdscore4_post)
+plot(impossdscore4_post[,"rho"])
+
+#study 5 difficulty-as-impossibility with dscore
+summary(impossdscore5)
+summary(impossdscore5_post[,"rho"])
+HPDinterval(impossdscore5_post[,"rho"])
+plot(impossdscore5_post[,"rho"])
+
+#study 6 difficulty-as-impossibility with dscore
+summary(impossdscore6)
+summary(impossdscore6_post)
+HPDinterval(impossdscore6_post)
+plot(impossdscore6_post[,"rho"])
+
+```
+
+```{r, extracting the output for figure, bayes factor I did by hand, include=FALSE}
+#study 3 difficulty-as-importance with dscore
+
+a<-summary(importdscore3_post[,"rho"])
+a<-a$statistics[1:1]
+a_ci<-HPDinterval(importdscore3_post[,"rho"])
+  
+
+#study 4 difficulty-as-importance with dscore
+b<-summary(importdscore4_post[,"rho"])
+b<-b$statistics[1:1]
+b_ci<-HPDinterval(importdscore4_post[,"rho"])
+  
+
+#study 5 difficulty-as-importance with dscore
+c<-summary(importdscore5_post[,"rho"])
+c<-c$statistics[1:1]
+c_ci<-HPDinterval(importdscore5_post[,"rho"])
+
+#study 6 difficulty-as-importance with dscore
+d<-summary(importdscore6_post[,"rho"])
+d<-d$statistics[1:1]
+d_ci<-HPDinterval(importdscore6_post[,"rho"])
+
+
+#study 3 difficulty-as-impossisibility with dscore
+
+e<-summary(impossdscore3_post[,"rho"])
+e<-e$statistics[1:1]
+e_ci<-HPDinterval(impossdscore3_post[,"rho"])
+  
+
+#study 4 difficulty-as-impossisibility with dscore
+f<-summary(impossdscore4_post[,"rho"])
+f<-f$statistics[1:1]
+f_ci<-HPDinterval(impossdscore4_post[,"rho"])
+  
+
+#study 5 difficulty-as-impossisibility with dscore
+g<-summary(impossdscore5_post[,"rho"])
+g<-g$statistics[1:1]
+g_ci<-HPDinterval(impossdscore5_post[,"rho"])
+
+#study 6 difficulty-as-impossisibility with dscore
+h<-summary(impossdscore6_post[,"rho"])
+h<-h$statistics[1:1]
+h_ci<-HPDinterval(impossdscore6_post[,"rho"])
+
+
+```
+```{r, results table} 
+
+#combine all of the objects to create a single table with relevant info. Note that I manually pulled out the bayes factors from the commands above. 
+
+results<-tibble(study=c("Study 3", "Study 4", "Study 5", "Study 6", 
+                        "Study 3", "Study 4", "Study 5", "Study 6"),
+                mindset=c("difficulty-as-importance", "difficulty-as-importance", "difficulty-as-importance", "difficulty-as-importance", 
+                                                "difficulty-as-impossibility", "difficulty-as-impossibility", "difficulty-as-impossibility", "difficulty-as-impossibility"),
+                         rho=c(a, b, c, d, 
+                                  e, f, g, h),
+                                  lb=c(a_ci[1:1], b_ci[1:1], c_ci[1:1], d_ci[1:1], 
+                                       e_ci[1:1], f_ci[1:1], g_ci[1:1], h_ci[1:1]),
+                         ub=c(a_ci[2:2], b_ci[2:2], c_ci[2:2], d_ci[2:2], 
+                                       e_ci[2:2], f_ci[2:2], g_ci[2:2], h_ci[2:2]), 
+                         bf10=c(0.197804, 0.1915565,0.5604964,0.1424846, 
+                               0.2955834,0.1896028 , 0.1600925, 0.1051248)
+)
+
+
+results
+```
+
+```{r, figures, echo=FALSE}
+
+#This creates a correlation plot in a tree-diagram sort of format. 
+
+results$rho<-round(results$rho,2)
+results %>%
+  arrange(rho) %>% 
+  mutate(study=factor(study, levels=c("Study 6", "Study 5", "Study 4", "Study 3"))) %>%
+ggplot(aes(x=study, y=rho, color=mindset, ymin=lb, ymax=ub, label=rho))+ 
+  #this adds the effect sizes to the plot
+  geom_point(position=position_dodge(.9))+ 
+  #adds the CIs
+  geom_errorbar(aes(ymin=lb, ymax=ub), width=.2, 
+                position=position_dodge(.9))+
+  facet_grid(mindset~., scales= "free", space="free", switch="both")+
+  #sets the scales
+  #note that I reverse the y axis to correctly order the effect #sizes based on my index variable
+  scale_y_continuous(name = "Correlation Coefficient", limits=c(-1, 1)) + 
+  scale_x_discrete(name="")+
+  #adding a vertical line at the effect = 0 mark
+  geom_hline(yintercept=0, color="black", linetype="dashed", alpha=.5)+
+  coord_flip()+
+  theme_classic(base_family="Times", base_size=14)+
+  scale_color_manual(name = "D-score correlation with:", values=c("forestgreen", "darkred"))+ 
+  theme(legend.position="none")+
+  geom_label(position=position_dodge(.9),  key_glyph=draw_key_point)
+
+```

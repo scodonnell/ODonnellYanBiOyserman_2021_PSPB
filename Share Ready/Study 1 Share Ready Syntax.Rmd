@@ -1,0 +1,321 @@
+---
+title: "Network of Words Difficulty, Impossible, Task"
+author: "Casey O'Donnell"
+date: "4/13/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(visNetwork)
+library(haven)
+library(tidytext)
+library(plyr)
+library(tidyr)
+library(stringr)
+library(dplyr)
+library(tidyverse)
+library(intergraph)
+library(ggforce)
+
+
+library(hunspell)
+library(purrr)
+library(RColorBrewer)
+library(wesanderson)
+
+library(ggraph)
+library(igraph)
+library(rgexf)
+library(shiny)
+
+
+
+```
+
+```{r file read in}
+#read in a file. I dropped all respondents who did not indicate united states for native language. This retains 604,342 of 1,223,518 respondents who responded to any cue at all. Will get smaller when we restrict to difficulty, impossible, and important cue words. 
+
+#data are available here: https://smallworldofwords.org/en/project/research 
+
+smallworld<-read_csv("SWOW-EN.R100.csv")
+
+```
+
+
+```{r define the cues that will restrict the sample further}
+Difficult<-c("difficulty","adversity","challenge","challenging","complication","difficult","hard","hardship","hurdle","obstacle","problem","setback","strain","straining") 
+Important<-c("important","worthy","worthwhile","valuable","valued","informative","useful","weighty","major","great","needed","big","imperative ","meaningful","crucial","vital","essential","critical","significant","importance","consequential")
+Impossible<-c("impossible","hopeless","impractical","unattainable","futile","unlikely","unworkable","infeasible","can't","improbable","helpless","unachievable ","unlikely","inability","impossibility","unable") 
+
+alltogether<-c("impossible","hopeless","impractical","unattainable","futile","unlikely","unworkable","infeasible","can't","improbable","helpless","unachievable ","unlikely","inability","impossibility","unable", "important","worthy","worthwhile","valuable","valued ","informative","useful","weighty","major","great","needed","big","imperative ","meaningful","crucial","vital","essential","critical","significant","importance","consequential", "difficulty","adversity","challenge","challenging","complication","difficult","hard","hardship","hurdle","obstacle","problem","setback","strain","straining")
+```
+
+```{r, include=TRUE, echo=FALSE}
+#we restrict the sample to those who report that their native language and current country are United states. Leaves us with 604,342 obs
+
+smallworld_filtered <- subset(smallworld, nativeLanguage=="United States")
+smallworld_filtered <- subset(smallworld_filtered, country=="United States")
+
+
+```
+```{r, include=TRUE, echo=FALSE}
+#we restrict to just the cues based on our defined word lists. This restricts our sample to only those respondents who responded to a cue that means difficulty, importance, or impossibility. This leaves us with 2092 observations to work with. 
+
+
+
+smallworld_imposs <- smallworld_filtered %>%
+  filter(cue %in% Impossible) 
+#440 obs. 
+smallworld_import <- smallworld_filtered %>%
+  filter(cue %in% Important) 
+#947 obs
+smallworld_diff <- smallworld_filtered %>%
+  filter(cue %in% Difficult) 
+#673 obs
+
+
+dismallworld_imposs<-unique(smallworld_imposs$participantID)
+#436 p's
+smallworld_import<-unique(smallworld_import$participantID)
+#1004 p's
+smallworld_diff<-unique(smallworld_diff$participantID)
+#669 p's
+
+
+smallworld_filtered <- smallworld_filtered %>%
+  filter(cue %in% alltogether) 
+
+smallworld_all<-unique(smallworld_filtered$participantID)
+
+```
+
+
+
+
+then you do some fancy data cleaning so that you can represent the data as an adjacency matrix and an igraph object
+```{r,  include=false, echo=FALSE}
+#I think what I have to do is go through each of the responses as a single file. I will then collapse across the three files based on their bigram counts following the script I have from my other work. 
+
+smallworlds_r1<-subset(smallworld_filtered, select=c("cue", "R1"))%>%
+    dplyr::rename("resp"="R1") 
+
+smallworlds_r2<-subset(smallworld_filtered, select=c("cue", "R2"))%>%
+     dplyr::rename("resp"="R2") 
+
+smallworlds_r3<-subset(smallworld_filtered, select=c("cue", "R3"))%>%
+     dplyr::rename("resp"="R3") 
+
+smallworlds_long<-rbind(smallworlds_r3, smallworlds_r2, smallworlds_r1)
+
+smallworlds_long$word1<-str_replace_na(smallworlds_long$resp, replacement="")
+
+bi_gram_counts_all<-smallworlds_long %>% 
+  dplyr::count(cue, resp, sort=TRUE)
+
+ bigram_graph_all <- bi_gram_counts_all %>%
+  graph_from_data_frame()
+ 
+  bigram_graph_morecommon <- bi_gram_counts_all %>%
+    filter(n>2 & resp!="NA") %>%
+  graph_from_data_frame()
+
+
+````
+We have to identify the vertices in a rather roundabout way so that I can assign our manual attributes to the graph--those attributes basically idnicate which words we identified as cue words for difficulty, importance, and impossibility. However, to be an attribute list, the file must include all vertex names, so I have to extract those from a graph object
+```{r}
+
+vertexnames<-V(bigram_graph_morecommon)$name
+vertexnames<-tibble(name=vertexnames)
+
+wordattributes<-vertexnames %>%
+  mutate(meaning=case_when(
+    name %in% Difficult ~"difficult", 
+    name%in% Impossible ~"impossible", 
+    name%in% Important ~"important"))
+         
+
+#
+```
+And now that we have the attributes we need, we remake the graph object. 
+```{r,}
+ bigram_graph_morecommon <- bi_gram_counts_all %>%
+    filter(n>2 & resp!="NA") %>%
+  graph_from_data_frame(vertices=wordattributes)
+
+justedges<-bi_gram_counts_all %>%
+    filter(n>2 & resp!="NA") %>%
+  subset( select=c(1:2))
+```
+
+```{r,making the initial graph without attributes}
+set.seed(2017)
+
+a <- grid::arrow(type = "closed", length = unit(.08, "inches"))
+
+
+#this creates a graph with all responses for Fall and color codes edges based on 
+##predicted possible identity scores. It isn't really interpretable. 
+ggraph(bigram_graph_morecommon, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n),  show.legend = FALSE,
+                 arrow = NULL, end_cap = circle(.07, 'inches')) +
+  geom_node_text(aes(label = name, color=meaning), check_overlap = FALSE, repel=FALSE, fontface="bold") 
+  theme_void()
+
+
+```
+```{r, calculating community detection}
+
+#defining the color pallette 
+pallette<-c("darkgreen", "firebrick4", "red3", "royalblue4",
+            "yellow4", "darkolivegreen3", "chartreuse3", "skyblue", 
+            "forestgreen")
+
+#extracting the hex values for those colors 
+gplots::col2hex(c("darkgreen", "firebrick4", "red3", "royalblue4",
+            "yellow4", "darkolivegreen3", "chartreuse3", "skyblue", 
+            "forestgreen"))
+
+#defining labels for community structure 
+labels<-c("Large Magnitude", "Inability", "Low Likelihood", "Central Difficult",
+            "Obligation", "Value", "Knowledge", "Peripheral Difficult", 
+            "Peripheral Important")
+
+#run community detection
+wc <- cluster_walktrap(bigram_graph_morecommon)
+modularity(wc)
+membership(wc)
+plot(wc, bigram_graph_morecommon)
+plot_dendrogram(wc)
+
+#recode and define the group variable based on community detection
+wordattributes$group<-wc$membership
+wordattributes$group<-recode_factor(wordattributes$group, 
+                             `4`="Central Difficult",
+                             `8`="Peripheral Difficult", 
+                             `3`="Low Likelihood", 
+                             `2`="Inability",
+                             `5`= "Obligation", 
+                             `6`="Value", 
+                             `1`="Large Magnitude",
+                             `7`="Knowledge", 
+                             `9`="Peripheral Important")
+
+#assign the colors
+wordattributes$color<-recode(wordattributes$group,
+                            "Central Difficult"= "royalblue4",
+                           "Peripheral Difficult" = "skyblue",
+                           "Low Likelihood"=  "red3",
+                           "Inability"= "firebrick4",
+                           "Obligation" = "yellow4",
+                           "Value"= "darkolivegreen3",
+                           "Large Magnitude"= "darkgreen",
+                           "Knowledge"= "chartreuse3",
+                           "Peripheral Important"= "forestgreen")
+
+
+degreescores<-as.data.frame(degree(bigram_graph_morecommon, normalized=FALSE)) 
+degreescores<-degreescores  %>% 
+  dplyr::rename("degree"=`degree(bigram_graph_morecommon, normalized = FALSE)`) 
+
+bigram_graph_morecommon<-set_vertex_attr(bigram_graph_morecommon, name="cluster", value=wc$membership)
+
+
+
+```
+
+````{r, }
+#one version of the graph
+ggraph(bigram_graph_morecommon, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n),  show.legend = FALSE,
+                 arrow = NULL, end_cap = circle(.07, 'inches')) +
+  geom_node_text(aes(label = name, color=as.factor(cluster)), check_overlap = FALSE, repel=FALSE, fontface="bold") +scale_color_manual(values=pallette, labels=labels)+theme_void()+labs(color = "Associative Network Community")+theme(legend.position = "bottom")
+
+```
+```
+
+green for importance, red hues for impossibility, grey-scale or something otherwise neutral.  
+  ````
+  
+```{r, }
+
+#this is the version that is interactive 
+nodes <- data.frame(id = wordattributes$name,
+                    
+  # add labels on nodes
+  label = wordattributes$name,
+  
+  # add groups on nodes 
+  group = wordattributes$group,
+  
+  # color
+  color = wordattributes$color
+  
+  # text color 
+  ) 
+
+  
+
+edges<- bi_gram_counts_all %>% 
+    filter(n>2 & resp!="NA")  %>% 
+  subset(select=1:2)
+
+visNetwork(nodes=nodes,
+           edges=edges)
+
+```
+  
+```{r, }
+
+
+graph_vis <- toVisNetworkData(bigram_graph_morecommon) # convert the graph (or use visIgraph)
+
+graph_vis$nodes$title <- graph_vis$nodes$label # Text on click
+graph_vis$nodes$color.background <- c("#006400", "#8B1A1A", "#CD0000", "#27408B", "#8B8B00", "#A2CD5A", "#66CD00", "#87CEEB", "#228B22")[graph_vis$nodes$cluster]
+graph_vis$nodes$color.border <- c("#006400", "#8B1A1A", "#CD0000", "#27408B", "#8B8B00", "#A2CD5A", "#66CD00", "#87CEEB", "#228B22")[graph_vis$nodes$cluster]
+graph_vis$nodes$color.highlight.background <- "orange"
+graph_vis$nodes$color.highlight.border <- "yellow"
+graph_vis$nodes$font.size <- 30
+
+
+graph_vis$nodes$SemanticGroup<-recode_factor(graph_vis$nodes$cluster, 
+                             `4`="Central Difficulty",
+                             `8`="Peripheral Difficulty", 
+                             `3`="Low Likelihood", 
+                             `2`="Inability",
+                             `5`= "Obligation", 
+                             `6`="Value", 
+                             `1`="Large Magnitude",
+                             `7`="Knowledge", 
+                             `9`="Peripheral Importance")
+
+#graph_vis$edges$width <- 1+links$weight/8 # line width
+links$color <- "gray"    # line color  
+links$arrows <- "middle" # arrows: 'from', 'to', or 'middle'
+edges$smooth <- FALSE    # should the edges be curved?
+links$shadow <- FALSE    # edge shadow
+
+
+network<-visNetwork(nodes = graph_vis$nodes,
+           edges = graph_vis$edges)%>% 
+  visNodes(font=list(size=20))%>%   
+  visOptions(selectedBy = "SemanticGroup", 
+             highlightNearest = list(enabled = TRUE,
+                                     degree = 1,
+                                     hover = TRUE,
+                                     labelOnly = TRUE))
+  
+
+network 
+
+visSave(network, "...InteractiveNetwork.html")
+
+  
+
+
+```
+
+
+
+  

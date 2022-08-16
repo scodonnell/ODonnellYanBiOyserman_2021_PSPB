@@ -1,0 +1,359 @@
+---
+title: "Bayesian T-Tests Study 3 to 7"
+author: "S. Casey O'Donnell"
+date: "10/17/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(haven)
+
+#install.packages("BayesFactor")
+library(BayesFactor)
+library(tidyverse)
+##read in the data for the studies using the D-AT and subset into indepedent 
+##dataframes 
+
+library(ggplot2)
+#remotes::install_github("coolbutuseless/ggpattern")
+library(ggpattern)
+library(purrr)
+
+
+DATStudies<-read_dta("/Volumes/GoogleDrive/.shortcut-targets-by-id/1HdnUIqJk4xXSTU36ZxZLpE0cred4rkNJ/Difficulty Associations Paper/Study Data and Syntax/Caseys Studies/Share Ready/Study 3-6 Data.dta")
+
+DATStudies$importavg<-as.numeric(DATStudies$importavg)
+DATStudies$impossavg<-as.numeric(DATStudies$impossavg)
+
+##for the one-sample t-tests on dscores, we need data files that do not have missing values on the variable of interest. We will re-read the files for difficulty-as-impossibility and as-importance endorsement that do not have missing values on those variables. A pipe operator could work to clean up the code, but ttestBF has some issues with piping it seems. 
+
+study3<-DATStudies%>%
+  subset(sample=="study 3" & dscore!="NA")
+
+study3Accurate<-study3%>% 
+  subset(inaccurate==0)
+
+study4<-DATStudies%>%
+  subset(sample=="study 4" & dscore!="NA")
+
+study4Accurate<-study4%>% 
+  subset(inaccurate==0)
+
+study5<-DATStudies%>%
+  subset(sample=="study 5" & dscore!="NA")
+
+study5Accurate<-study5%>% 
+  subset(inaccurate==0)
+
+study6<-DATStudies%>%
+  subset(sample=="study 6" & dscore!="NA")
+
+study6Accurate<-study6%>% 
+  subset(inaccurate==0)
+
+```
+
+run the models using BayesFactor package and the 
+ttestBF command. 
+
+Each model prints an r value (the scaling on the prior--in this case sqrt(2)/2 and the estimated bayes factor in favor of the null hypothesis. Sometimes I sample from the posterior to generate an estimate of the mean dscore and it's 95% credible intervaldefined by the highest probability density (hpd)
+
+In this set of studies, the bayes factor, does not favor the null and in even in  the underlying data, most of the distribution is below 0. At times this yields statements that are kind of absurd in terms of strength of argument--bf=4525 in study 2, for instance. That means the ratio of probability is like 4000 to 1 that a model that allows for an effect is accurate given the data as compared to a model that only lets the effect be 0. 
+
+For each study, I run four commands. One pair refers to the sample 
+#when inaccurate responses are included (e.g., m1 and m1_post) vs. the other pair (e.g., m1_accur and m1_accur post that only examines respondents with Difficulty Association Task accuracies greater or equal to 75%. The "post" subscript indicates that I'm running a command that samples from the posterior distribution so that I can describe the 
+parameter of interest: sample mean dscore. The difference between posterior and observed is the prior. In the null model (not depicted but described in the syntax for the command: ?ttestBF), the prior on mu (or mean dscore) is defined as a spike on 0 (a dscore indicating neither a tendency to associate difficulty with impossibility or importance). In the alternative model, the prior is non-informative cauchy prior which, in lay terms, basically says the mean could plausibly fall anywhere in a particular range centered on zero and could be stated as the naive hypothesis that a difference from zero is possible. 
+
+```{r cars, the models}
+#set seed to yield consistent results on re-running syntax
+set.seed(31234)
+m1<- ttestBF(study3$dscore, mu=0, posterior = FALSE, data=study3 , 
+             iterations=2000) 
+
+m1_post<- ttestBF(study3$dscore, mu=0, posterior = TRUE, data=study3 , 
+             iterations=2000) 
+
+m1_acc<- ttestBF(study3Accurate$dscore, mu=0, posterior = FALSE, data=study3 , 
+             iterations=2000)
+m1_post_acc<- ttestBF(study3Accurate$dscore, mu=0, posterior = TRUE, data=study3 , 
+             iterations=2000)
+
+m2<- ttestBF(study4$dscore, mu=0, posterior = FALSE, data=study4 , 
+             iterations=2000)
+m2_post<- ttestBF(study4$dscore, mu=0, posterior = TRUE, data=study4 , 
+             iterations=2000)
+
+m2_acc<- ttestBF(study4Accurate$dscore, mu=0, posterior = FALSE, data=study4 , 
+             iterations=2000)
+m2_post_acc<- ttestBF(study4Accurate$dscore, mu=0, posterior = TRUE, data=study4 , 
+             iterations=2000)
+
+
+m3<- ttestBF(study5$dscore, mu=0, posterior = FALSE, data=study5 , 
+             iterations=2000)
+m3_post<- ttestBF(study5$dscore, mu=0, posterior = TRUE, data=study5 , 
+             iterations=2000)
+
+m3_acc<- ttestBF(study5Accurate$dscore, mu=0, posterior = FALSE, data=study5 , 
+             iterations=2000)
+m3_post_acc<- ttestBF(study5Accurate$dscore, mu=0, posterior = TRUE, data=study5 , 
+             iterations=2000)
+
+
+m4<- ttestBF(study6$dscore, mu=0, posterior = FALSE, data=study6 , 
+             iterations=2000)
+m4_post<- ttestBF(study6$dscore, mu=0, posterior = TRUE, data=study6 , 
+             iterations=2000)
+
+m4_acc<- ttestBF(study6Accurate$dscore, mu=0, posterior = FALSE, data=study6 , 
+             iterations=2000)
+m4_post_acc<- ttestBF(study6Accurate$dscore, mu=0, posterior = TRUE, data=study6 , 
+             iterations=2000)
+
+```
+
+```{r, the output}
+summary(m1)
+summary(m1_post)
+HPDinterval(m1_post)
+
+summary(m1_acc)
+summary(m1_post_acc)
+HPDinterval(m1_post_acc)
+
+summary(m2)
+summary(m2_post)
+HPDinterval(m2_post)
+
+summary(m2_acc)
+summary(m2_post_acc)
+HPDinterval(m2_post_acc)
+
+summary(m3)
+summary(m3_post)
+HPDinterval(m3_post)
+
+summary(m3_acc)
+summary(m3_post_acc)
+HPDinterval(m3_post_acc)
+
+summary(m4)
+summary(m4_post)
+HPDinterval(m4_post)
+
+summary(m4_acc)
+summary(m4_post_acc)
+HPDinterval(m4_post_acc)
+
+```
+
+```{r, plots} 
+
+psych::describe(study3Accurate$dscore)
+psych::describe(study3$dscore)
+
+
+results<-tibble(study=c("Study 3", "Study 4", "Study 5", "Study 6", 
+                        "Study 3", "Study 4", "Study 5", "Study 6"),
+                inaccuraterespondentsincluded=c("No", "No", "No", "No", 
+                                                "Yes", "Yes", "Yes", "Yes"),
+                         dscore=c(-0.2243, -0.1557, -0.2178, -0.09128, 
+                                  -0.3526, -0.1010, -0.1966, -0.0854),
+                                  lb=c(-0.28208476, -0.21719630,-0.26412146, -0.12361496,
+                                       -0.43084877, -0.16045016, -0.24371008, -0.12848118),
+                         ub=c(-0.1647141, -0.09294639, -0.1715335, -0.05444144, 
+                              -0.2680357, -0.04458135, -0.1493729, -0.04827130), 
+                         bf10=c(6825272523, 4525.055,1.444575e+16,29888.35, 
+                                1.892206e+12, 26.88957, 264938732278, 138.5868)
+)
+
+
+
+results
+```
+
+```{r, figures, echo=FALSE}
+
+
+ggplot(results, aes(study ,dscore, fill=inaccuraterespondentsincluded, pattern=inaccuraterespondentsincluded)) + 
+  geom_bar_pattern(stat="identity", color="black", 
+           position=position_dodge(), 
+           pattern_fill = "black",
+           pattern_angle = 45,
+           pattern_density = 0.1,
+           pattern_spacing = 0.025,
+           pattern_key_scale_factor = 0.6) +
+  geom_errorbar(aes(ymin=lb, ymax=ub), width=.2,
+                position=position_dodge(.9))+
+  scale_y_continuous(name="Difficulty Associations Task D-Score", 
+                     limits=c(-.5, .2))+
+  scale_x_discrete(name="Sample")+
+  theme_classic(base_family="Times", base_size=14) + 
+  theme(legend.position="bottom")+ 
+  geom_hline(yintercept = 0)+
+  scale_fill_manual(name = "Inaccurate Respondents Included", values=c("darkred", "red"))+
+  scale_pattern_manual(name = "Inaccurate Respondents Included", values=c("none", "stripe") ) 
+
+results%>%
+  mutate(study=factor(study, levels=c("Study 6", 
+                         "Study 5", 
+                         "Study 4",
+                         "Study 3")))%>%
+ggplot(aes(study ,dscore, fill=inaccuraterespondentsincluded, pattern=inaccuraterespondentsincluded)) + 
+  geom_bar_pattern(stat="identity", color="black", 
+           position=position_dodge(), 
+           pattern_fill = "black",
+           pattern_angle = 45,
+           pattern_density = 0.1,
+           pattern_spacing = 0.025,
+           pattern_key_scale_factor = 0.6) +
+  geom_errorbar(aes(ymin=lb, ymax=ub), width=.2,
+                position=position_dodge(.9))+
+  scale_y_continuous(name="Difficulty Associations Task D-Score", 
+                     limits=c(-.5, .2))+
+  scale_x_discrete(name="Sample")+
+  theme_classic(base_family="Times", base_size=14) + 
+  theme(legend.position="bottom")+ 
+  geom_hline(yintercept = 0)+
+  scale_fill_manual(name = "Inaccurate Respondents Included", values=c("darkred", "red"))+
+  coord_flip()+
+  scale_pattern_manual(name = "Inaccurate Respondents Included", values=c("none", "stripe") ) 
+
+```
+
+```{r subsetting the data again for mindset endorsement analyses,  include=FALSE}
+
+study3_a<-DATStudies%>%
+  subset(sample=="study 3" & importavg!="NA")
+
+study4_a<-DATStudies%>%
+  subset(sample=="study 4" & importavg!="NA")
+
+study5_a<-DATStudies%>%
+  subset(sample=="study 5" & importavg!="NA")
+
+study6_a<-DATStudies%>%
+  subset(sample=="study 6" & importavg!="NA")
+
+```
+
+```{r one-sample on difficulty as-importance}
+
+import3<-ttestBF(study3_a$importavg, mu=3.5, posterior = FALSE, data=study3_a, 
+             iterations=2000)
+
+import3_post<- ttestBF(study3_a$importavg, mu=3.5, posterior = TRUE, data=study3_a, 
+             iterations=2000)
+
+import4<- ttestBF(study4_a$importavg, mu=3.5, posterior = FALSE, data=study4_a , 
+             iterations=2000)
+import4_post<- ttestBF(study4_a$importavg, mu=3.5, posterior = TRUE, data=study4_a , 
+             iterations=2000)
+
+import5<- ttestBF(study5_a$importavg, mu=3.5, posterior = FALSE, data=study5_a , 
+             iterations=2000)
+import5_post<- ttestBF(study5_a$importavg, mu=3.5, posterior = TRUE, data=study5_a , 
+           iterations=2000)
+
+import6<- ttestBF(study6_a$importavg, mu=3, posterior = FALSE, data=study6_a , 
+             iterations=2000)
+import6_post<- ttestBF(study6_a$importavg, mu=3, posterior = TRUE, data=study6_a , 
+             iterations=2000)
+
+
+```
+
+```{r, difficulty-as-importance results one-sample}
+
+summary(import3)
+summary(import3_post)
+
+summary(import4)
+summary(import4_post)
+
+summary(import5)
+summary(import5_post)
+
+summary(import6)
+summary(import6_post)
+
+```
+
+```{r, subsetting  the data again for mindset endorsement analyses, impossibility, include=FALSE}
+
+study3_b<-DATStudies%>%
+  subset(sample=="study 3" & impossavg!="NA")
+
+study4_b<-DATStudies%>%
+  subset(sample=="study 4" & impossavg!="NA")
+
+study5_b<-DATStudies%>%
+  subset(sample=="study 5" & impossavg!="NA")
+
+study6_b<-DATStudies%>%
+  subset(sample=="study 6" & impossavg!="NA")
+
+```
+
+```{r, one-sample on difficulty as-impossibility}
+set.seed(12345)
+
+imposs3<- ttestBF(study3_b$impossavg, mu=3.5, posterior = FALSE, data=study3_b , 
+             iterations=2000)
+imposs3_post<- ttestBF(study3$impossavg, mu=3.5, posterior = TRUE, data=study3_b , 
+             iterations=2000)
+
+imposs4<- ttestBF(study4_b$impossavg, mu=3.5, posterior = FALSE, data=study4_b, 
+             iterations=2000)
+imposs4_post<- ttestBF(study4_b$impossavg, mu=3.5, posterior = TRUE, data=study4_b , 
+             iterations=2000)
+
+imposs5<- ttestBF(study5_b$impossavg, mu=3.5, posterior = FALSE, data=study5_b , 
+             iterations=2000)
+imposs5_post<- ttestBF(study5_b$impossavg, mu=3.5, posterior = TRUE, data=study5_b , 
+           iterations=2000)
+
+imposs6<- ttestBF(study6_b$impossavg, mu=3, posterior = FALSE, data=study6_b , 
+             iterations=2000)
+imposs6_post<- ttestBF(study6_b$impossavg, mu=3, posterior = TRUE, data=study6_b , 
+             iterations=2000)
+
+
+```
+
+```{r, difficulty-as-impossibililty results one-sample}
+
+summary(imposs3)
+summary(imposs3_post)
+
+summary(imposs4)
+summary(imposs4_post)
+
+summary(imposs5)
+summary(imposs5_post)
+
+summary(imposs6)
+summary(imposs6_post)
+
+```
+
+```{r, results for mindset endorsement}
+
+results<-tibble(
+  sample=c("Study 3", "Study 4", "Study 5", "Study 6","Study 3", "Study 4", "Study 5", "Study 6"), 
+  mindset=c("Difficulty-As-Importance", "Difficulty-As-Importance", "Difficulty-As-Importance", "Difficulty-As-Importance", 
+            "Difficulty-As-Impossibility", "Difficulty-As-Impossibility", "Difficulty-As-Impossibility", "Difficulty-As-Impossibility"), 
+  mindsetmean=c(4.3086, 4.3477 , 4.3342, 3.3187, 
+                2.763, 2.762, 2.6695, 2.4597),
+  lb=c(4.2065255, 4.2337749, 4.2636387, 3.2769177,
+       2.6101083, 2.6270874, 2.5924720, 2.4151807), 
+  ub=c(4.408676, 4.462282, 4.4019963, 3.3621302,
+       2.865505, 2.903017, 2.740224, 2.5031756), 
+  bf10=c(2.990066e+40, 1.781003e+31,  9.203378e+86, 2.329771e+40,
+         4.21602e+27, 1.021693e+18, 1.75563e+73, 1.246871e+105)) 
+
+
+results
+````
